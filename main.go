@@ -1,62 +1,80 @@
-package main
+package scgiclient
 
 import (
 	"bufio"
 	"bytes"
 	"fmt"
 	"io"
-	"log"
+	"io/ioutil"
 	"net"
-	//	"net/http"
 	"strconv"
 	"strings"
 )
 
-func main() {
-	conn, err := net.Dial("tcp", "localhost:5000")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close()
-	err = writeRequest(conn)
-	if err != nil {
-		log.Fatal(err)
-	}
+// TODO(mpl): I don't like this api. redo it similar to http?
+
+func Receive(conn net.Conn) ([]byte, error) {
 	resp := bufio.NewReader(conn)
 	terminator := string([]byte{13, 10})
 	status, err := resp.ReadString('\n')
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	status = strings.TrimRight(status, terminator)
 	if status != "Status: 200 OK" {
-		for _, v := range status {
-			println(v)
-		}
-		log.Fatal(status)
+		return nil, fmt.Errorf("Got %v as response status", status)
 	}
-	body := bytes.NewBuffer([]byte{})
-	if _, err = io.Copy(body, resp); err != nil {
-		log.Fatal(err)
+	// TODO(mpl): other header fields should not be in the body
+	var body bytes.Buffer
+	if _, err = io.Copy(&body, resp); err != nil {
+		return nil, fmt.Errorf("Could not read response: %v", err)
 	}
-	fmt.Printf("%v", body.String())
+	return body.Bytes(), nil
 }
 
-var (
-	comma = []byte(",")
-	colon = []byte(":")
-)
-
-func netstring(s []byte) []byte {
-	le := []byte(strconv.Itoa(len(s)))
-	ns := append(le, byte(':'))
-	ns = append(ns, s...)
-	ns = append(ns, byte(','))
-	return ns
+func Send(addr string, r io.Reader) (net.Conn, error) {
+	// TODO(mpl): maybe take the dial out of here and then
+	// we do not have to return the conn ?
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	body, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	req := newRequest(body)
+	if _, err = req.send(conn); err != nil {
+		return nil, err
+	}
+	return conn, nil
 }
 
-func message(header, body []byte) []byte {
-	return append(netstring(header), body...)
+type request struct {
+	header []byte
+	body   []byte
+}
+
+func newRequest(body []byte) request {
+	return request{
+		header: defaultHeader(len(body)),
+		body:   body,
+	}
+}
+
+func (r *request) send(c net.Conn) (int64, error) {
+	msg := append(netstring(r.header), r.body...)
+	return io.Copy(c, bytes.NewReader(msg))
+}
+
+// TODO(mpl): report hoisie his scgi server panics if field missing
+func defaultHeader(bodyLen int) []byte {
+	var dh []byte
+	defaultHeaderFields["CONTENT_LENGTH"] = strconv.Itoa(bodyLen)
+	for k, v := range defaultHeaderFields {
+		dh = append(dh, header(k, v)...)
+	}
+	return dh
 }
 
 func header(name, value string) []byte {
@@ -72,26 +90,15 @@ var defaultHeaderFields = map[string]string{
 	"SERVER_PROTOCOL": "HTTP/1.1",
 }
 
-// TODO(mpl): report hoisie it panics if field missing
-func defaultHeader(bodyLen int) []byte {
-	var dh []byte
-	defaultHeaderFields["CONTENT_LENGTH"] = strconv.Itoa(bodyLen)
-	for k, v := range defaultHeaderFields {
-		dh = append(dh, header(k, v)...)
-	}
-	return dh
-}
+const (
+	comma = byte(',')
+	colon = byte(':')
+)
 
-var command = `<?xml version="1.0"?>
-<methodCall>
-	<methodName>get_upload_rate</methodName>
-</methodCall>
-`
-
-func writeRequest(fd io.ReadWriteCloser) error {
-	//	command := "get_upload_rate"
-	header := defaultHeader(len(command))
-	msg := message(header, []byte(command))
-	_, err := io.Copy(fd, bytes.NewReader(msg))
-	return err
+func netstring(s []byte) []byte {
+	le := []byte(strconv.Itoa(len(s)))
+	ns := append(le, colon)
+	ns = append(ns, s...)
+	ns = append(ns, comma)
+	return ns
 }
