@@ -1,16 +1,19 @@
 package main
 
 import (
-	"bytes"
 	"bufio"
+	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"net"
+	//	"net/http"
 	"strconv"
+	"strings"
 )
 
 func main() {
-	conn, err := net.Dial("tcp", "localhost:6580")
+	conn, err := net.Dial("tcp", "localhost:5000")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -19,11 +22,24 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	status, err := bufio.NewReader(conn).ReadString('\n')
+	resp := bufio.NewReader(conn)
+	terminator := string([]byte{13, 10})
+	status, err := resp.ReadString('\n')
 	if err != nil {
 		log.Fatal(err)
 	}
-	println(status)
+	status = strings.TrimRight(status, terminator)
+	if status != "Status: 200 OK" {
+		for _, v := range status {
+			println(v)
+		}
+		log.Fatal(status)
+	}
+	body := bytes.NewBuffer([]byte{})
+	if _, err = io.Copy(body, resp); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%v", body.String())
 }
 
 var (
@@ -49,28 +65,33 @@ func header(name, value string) []byte {
 	return append(h, 0)
 }
 
-var defaultHeaderFields = map[string]string {
-	"CONTENT_LENGTH":"",
-	"SCGI":"1",
-	"REQUEST_METHOD":"POST",
-	"SERVER_PROTOCOL":"HTTP/1.1",
+var defaultHeaderFields = map[string]string{
+	"CONTENT_LENGTH":  "",
+	"SCGI":            "1",
+	"REQUEST_METHOD":  "POST",
+	"SERVER_PROTOCOL": "HTTP/1.1",
 }
 
 // TODO(mpl): report hoisie it panics if field missing
 func defaultHeader(bodyLen int) []byte {
 	var dh []byte
 	defaultHeaderFields["CONTENT_LENGTH"] = strconv.Itoa(bodyLen)
-	for k,v := range defaultHeaderFields {
+	for k, v := range defaultHeaderFields {
 		dh = append(dh, header(k, v)...)
 	}
 	return dh
 }
 
+var command = `<?xml version="1.0"?>
+<methodCall>
+	<methodName>get_upload_rate</methodName>
+</methodCall>
+`
+
 func writeRequest(fd io.ReadWriteCloser) error {
-	command := "get_upload_rate"
+	//	command := "get_upload_rate"
 	header := defaultHeader(len(command))
 	msg := message(header, []byte(command))
 	_, err := io.Copy(fd, bytes.NewReader(msg))
 	return err
 }
-
