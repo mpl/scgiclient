@@ -5,5 +5,5 @@ I needed an scgi client so I could talk to rtorrent locally, without going throu
 
 This lib allows talking to both github.com/hoisie/web scgi server and rtorrent so it's good enough for me for now.
 
-http://github.com/mpl/scgiclient/example/rtorrent.go shows how to send a simple xml-rpc command to rtorrent.
+https://github.com/mpl/scgiclient/blob/master/example/rtorrent.go shows how to send a simple xml-rpc command to rtorrent.
 
