@@ -9,11 +9,15 @@ import (
 	"github.com/mpl/scgiclient"
 )
 
-func ughxml(command string) string {
-	return `<?xml version="1.0"?>
+func ughxml(command, arg string) string {
+	xml := `<?xml version="1.0"?>
 	<methodCall>
-		<methodName>` + command + `</methodName>
-	</methodCall>`
+		<methodName>` + command + `</methodName>`
+	if arg != "" {
+		xml += `<params><param><value><string>` + arg + `</string></value></param></params>`
+	}
+	xml += "</methodCall>"
+	return xml
 }
 
 func main() {
@@ -24,7 +28,12 @@ func main() {
 	}
 	// TODO(mpl): hostport parsing. trust for now.
 	addr := args[0]
-	xmlrpc := ughxml(args[1])
+	command := args[1]
+	cmdArg := ""
+	if args[2] != "" {
+		cmdArg = args[2]
+	}
+	xmlrpc := ughxml(command, cmdArg)
 	conn, err := scgiclient.Send(addr, bytes.NewReader([]byte(xmlrpc)))
 	if err != nil {
 		log.Fatal(err)
