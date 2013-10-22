@@ -13,7 +13,7 @@ import (
 
 // TODO(mpl): I don't like this api. redo it similar to http?
 
-func Receive(conn net.Conn) ([]byte, error) {
+func receive(conn net.Conn) (io.Reader, error) {
 	resp := bufio.NewReader(conn)
 	terminator := string([]byte{13, 10})
 	status, err := resp.ReadString('\n')
@@ -29,12 +29,10 @@ func Receive(conn net.Conn) ([]byte, error) {
 	if _, err = io.Copy(&body, resp); err != nil {
 		return nil, fmt.Errorf("Could not read response: %v", err)
 	}
-	return body.Bytes(), nil
+	return &body, nil
 }
 
-func Send(addr string, r io.Reader) (net.Conn, error) {
-	// TODO(mpl): maybe take the dial out of here and then
-	// we do not have to return the conn ?
+func Send(addr string, r io.Reader) (*Response, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
@@ -47,7 +45,18 @@ func Send(addr string, r io.Reader) (net.Conn, error) {
 	if _, err = req.send(conn); err != nil {
 		return nil, err
 	}
-	return conn, nil
+	responseBody, err := receive(conn)
+	if err != nil {
+		return nil, err
+	}
+	return &Response{
+			Body: responseBody,
+	}, nil
+}
+
+
+type Response struct {
+	Body io.Reader
 }
 
 type request struct {
