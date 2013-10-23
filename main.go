@@ -50,13 +50,18 @@ func Send(addr string, r io.Reader) (*Response, error) {
 		return nil, err
 	}
 	return &Response{
-			Body: responseBody,
+		conn: conn,
+		Body: responseBody,
 	}, nil
 }
 
-
 type Response struct {
+	conn net.Conn
 	Body io.Reader
+}
+
+func (r *Response) Close() error {
+	return r.conn.Close()
 }
 
 type request struct {
