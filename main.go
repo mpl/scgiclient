@@ -3,6 +3,7 @@ package scgiclient
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,27 +11,6 @@ import (
 	"strconv"
 	"strings"
 )
-
-// TODO(mpl): I don't like this api. redo it similar to http?
-
-func receive(conn net.Conn) (io.Reader, error) {
-	resp := bufio.NewReader(conn)
-	terminator := string([]byte{13, 10})
-	status, err := resp.ReadString('\n')
-	if err != nil {
-		return nil, err
-	}
-	status = strings.TrimRight(status, terminator)
-	if status != "Status: 200 OK" {
-		return nil, fmt.Errorf("Got %v as response status", status)
-	}
-	// TODO(mpl): other header fields should not be in the body
-	var body bytes.Buffer
-	if _, err = io.Copy(&body, resp); err != nil {
-		return nil, fmt.Errorf("Could not read response: %v", err)
-	}
-	return &body, nil
-}
 
 func Send(addr string, r io.Reader) (*Response, error) {
 	conn, err := net.Dial("tcp", addr)
@@ -41,44 +21,97 @@ func Send(addr string, r io.Reader) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	req := newRequest(body)
-	if _, err = req.send(conn); err != nil {
+	req := NewRequest(addr, body)
+	req.conn = conn
+	if _, err = req.Send(); err != nil {
 		return nil, err
 	}
-	responseBody, err := receive(conn)
+	resp, err := req.Receive()
 	if err != nil {
 		return nil, err
 	}
-	return &Response{
-		conn: conn,
-		Body: responseBody,
-	}, nil
+	err = conn.Close()
+	return resp, err
+}
+
+type Request struct {
+	Addr string
+	Header []byte
+	Body   []byte
+	conn net.Conn
+}
+
+func NewRequest(addr string, body []byte) *Request {
+	return &Request{
+		Addr: addr,
+		Header: defaultHeader(len(body)),
+		Body:   body,
+	}
+}
+
+func (r *Request) Close() error {
+	return r.conn.Close()
+}
+
+func (r *Request) Send() (int64, error) {
+	var err error
+	if r.conn == nil {
+		r.conn, err = net.Dial("tcp", r.Addr)
+		if err != nil {
+			return 0, err
+		}
+	}
+	msg := append(netstring(r.Header), r.Body...)
+	return io.Copy(r.conn, bytes.NewReader(msg))
+}
+
+func (r *Request) Receive() (*Response, error) {
+	if r.conn == nil {
+		return nil, errors.New("Can not receive on a closed connection")
+	}
+	return receive(r.conn)
+}
+
+type ResponseHeader struct {
+	Raw []byte
+	Status string
 }
 
 type Response struct {
+	Header *ResponseHeader
+	Body []byte
 	conn net.Conn
-	Body io.Reader
 }
 
 func (r *Response) Close() error {
 	return r.conn.Close()
 }
 
-type request struct {
-	header []byte
-	body   []byte
-}
-
-func newRequest(body []byte) request {
-	return request{
-		header: defaultHeader(len(body)),
-		body:   body,
+func receive(conn net.Conn) (*Response, error) {
+	r := bufio.NewReader(conn)
+	status, err := r.ReadString('\n')
+	if err != nil {
+		return nil, err
 	}
-}
-
-func (r *request) send(c net.Conn) (int64, error) {
-	msg := append(netstring(r.header), r.body...)
-	return io.Copy(c, bytes.NewReader(msg))
+	terminator := string([]byte{13, 10})
+	status = strings.TrimRight(status, terminator)
+	header := &ResponseHeader{
+		Status: status,
+	}
+	resp := &Response{
+		Header: header,
+		conn: conn,
+	}
+	if status != "Status: 200 OK" {
+		return resp, fmt.Errorf("Got %v as response status", status)
+	}
+	// TODO(mpl): other header fields should not be in the body
+	var body bytes.Buffer
+	if _, err = io.Copy(&body, r); err != nil {
+		return nil, fmt.Errorf("Could not read response: %v", err)
+	}
+	resp.Body = body.Bytes()
+	return resp, nil
 }
 
 // TODO(mpl): report hoisie his scgi server panics if field missing

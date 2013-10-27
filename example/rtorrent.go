@@ -3,10 +3,10 @@ package main
 import (
 	"bytes"
 	"flag"
-	//	"fmt"
-	"io"
+	"fmt"
+//	"io"
 	"log"
-	"os"
+//	"os"
 
 	"github.com/mpl/scgiclient"
 )
@@ -41,9 +41,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer resp.Close()
-	_, err = io.Copy(os.Stdout, resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
+	fmt.Printf("%v", string(resp.Body))
 }
