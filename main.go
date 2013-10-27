@@ -35,15 +35,15 @@ func Send(addr string, r io.Reader) (*Response, error) {
 }
 
 type Request struct {
-	Addr string
+	Addr   string
 	Header []byte
 	Body   []byte
-	conn net.Conn
+	conn   net.Conn
 }
 
 func NewRequest(addr string, body []byte) *Request {
 	return &Request{
-		Addr: addr,
+		Addr:   addr,
 		Header: defaultHeader(len(body)),
 		Body:   body,
 	}
@@ -72,15 +72,10 @@ func (r *Request) Receive() (*Response, error) {
 	return receive(r.conn)
 }
 
-type ResponseHeader struct {
-	Raw []byte
-	Status string
-}
-
 type Response struct {
-	Header *ResponseHeader
-	Body []byte
-	conn net.Conn
+	Header map[string]string
+	Body   []byte
+	conn   net.Conn
 }
 
 func (r *Response) Close() error {
@@ -89,25 +84,37 @@ func (r *Response) Close() error {
 
 func receive(conn net.Conn) (*Response, error) {
 	r := bufio.NewReader(conn)
-	status, err := r.ReadString('\n')
-	if err != nil {
-		return nil, err
-	}
+	header := make(map[string]string)
 	terminator := string([]byte{13, 10})
-	status = strings.TrimRight(status, terminator)
-	header := &ResponseHeader{
-		Status: status,
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+		line = strings.TrimRight(line, terminator)
+		if line == "" {
+			break
+		}
+		keyValue := strings.SplitN(line, ": ", 2)
+		if len(keyValue) != 2 {
+			return nil, fmt.Errorf("Bogus header line in response: %q", line)
+		}
+		header[keyValue[0]] = keyValue[1]
 	}
+
 	resp := &Response{
 		Header: header,
-		conn: conn,
+		conn:   conn,
 	}
-	if status != "Status: 200 OK" {
+	status, ok := header["Status"]
+	if !ok {
+		return nil, errors.New("Did not get a status line in response header")
+	}
+	if status != "200 OK" {
 		return resp, fmt.Errorf("Got %v as response status", status)
 	}
-	// TODO(mpl): other header fields should not be in the body
 	var body bytes.Buffer
-	if _, err = io.Copy(&body, r); err != nil {
+	if _, err := io.Copy(&body, r); err != nil {
 		return nil, fmt.Errorf("Could not read response: %v", err)
 	}
 	resp.Body = body.Bytes()

@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-//	"io"
 	"log"
-//	"os"
 
 	"github.com/mpl/scgiclient"
 )
@@ -36,10 +34,12 @@ func main() {
 		cmdArg = args[2]
 	}
 	xmlrpc := ughxml(command, cmdArg)
-	//	conn, err := scgiclient.Send(addr, bytes.NewReader([]byte(xmlrpc)))
 	resp, err := scgiclient.Send(addr, bytes.NewReader([]byte(xmlrpc)))
 	if err != nil {
 		log.Fatal(err)
+	}
+	for k, v := range resp.Header {
+		println(k + ": " + v)
 	}
 	fmt.Printf("%v", string(resp.Body))
 }
