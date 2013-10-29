@@ -1,3 +1,6 @@
+// Package scgiclient implements the client side of the
+// Simple Common Gateway Interface protocol, as described
+// at http://python.ca/scgi/protocol.txt
 package scgiclient
 
 import (
@@ -12,11 +15,16 @@ import (
 	"strings"
 )
 
+// Send sends and scgi request to addr, with
+// all the data read from r as the body of the request.
+// The received response is returned and the connection
+// to addr is closed.
 func Send(addr string, r io.Reader) (*Response, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
+	defer conn.Close()
 	body, err := ioutil.ReadAll(r)
 	if err != nil {
 		return nil, err
@@ -26,12 +34,7 @@ func Send(addr string, r io.Reader) (*Response, error) {
 	if _, err = req.Send(); err != nil {
 		return nil, err
 	}
-	resp, err := req.Receive()
-	if err != nil {
-		return nil, err
-	}
-	err = conn.Close()
-	return resp, err
+	return req.Receive()
 }
 
 type Request struct {
