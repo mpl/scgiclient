@@ -44,6 +44,8 @@ type Request struct {
 	conn   net.Conn
 }
 
+// NewRequest returns a Request ready to be sent with
+// Request.Send().
 func NewRequest(addr string, body []byte) *Request {
 	return &Request{
 		Addr:   addr,
@@ -52,10 +54,16 @@ func NewRequest(addr string, body []byte) *Request {
 	}
 }
 
+// Close closes the connection to r.Addr
 func (r *Request) Close() error {
-	return r.conn.Close()
+	if r.conn != nil {
+		return r.conn.Close()
+	}
 }
 
+// Send sends an scgi message built with
+// r.Header and r.Body, to r.Addr. It returns the
+// number of bytes sent and an error, if any.
 func (r *Request) Send() (int64, error) {
 	var err error
 	if r.conn == nil {
