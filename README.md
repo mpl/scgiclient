@@ -10,4 +10,4 @@ Install:
 2.	go get github.com/mpl/scgiclient
 
 
-[1]: http://github.com/mpl/rtorrentrpc	"rtorrentrpc"
+[1]: http://github.com/mpl/rtorrentrpc
