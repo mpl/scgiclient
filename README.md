@@ -1,9 +1,13 @@
 scgiclient
 ==========
 
-I needed an scgi client so I could talk to rtorrent locally, without going through the hassle of setting up an http server in between. Especially since there's no Go lib that does xmlrpc which would allow me to write my own server for that.
+Because I needed to talk scgi to do [rtorrentrpc] [1]
 
-This lib allows talking to both github.com/hoisie/web scgi server and rtorrent so it's good enough for me for now.
+Install:
+--------
 
-https://github.com/mpl/scgiclient/blob/master/example/rtorrent.go shows how to send a simple xml-rpc command to rtorrent.
+1.	Install Go: http://golang.org/doc/install
+2.	go get github.com/mpl/scgiclient
 
+
+[1]: http://github.com/mpl/rtorrentrpc	"rtorrentrpc"

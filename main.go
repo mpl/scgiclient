@@ -1,3 +1,7 @@
+/*
+Copyright 2013 Mathieu Lonjaret.
+*/
+
 // Package scgiclient implements the client side of the
 // Simple Common Gateway Interface protocol, as described
 // at http://python.ca/scgi/protocol.txt
@@ -54,11 +58,9 @@ func NewRequest(addr string, body []byte) *Request {
 	}
 }
 
-// Close closes the connection to r.Addr
+// Close closes the connection to r.Addr.
 func (r *Request) Close() error {
-	if r.conn != nil {
-		return r.conn.Close()
-	}
+	return r.conn.Close()
 }
 
 // Send sends an scgi message built with
@@ -76,6 +78,9 @@ func (r *Request) Send() (int64, error) {
 	return io.Copy(r.conn, bytes.NewReader(msg))
 }
 
+// Receive reads the response from r.Addr and returns
+// it in a Response. The connection to r.Addr must already
+// be established.
 func (r *Request) Receive() (*Response, error) {
 	if r.conn == nil {
 		return nil, errors.New("Can not receive on a closed connection")
@@ -89,6 +94,7 @@ type Response struct {
 	conn   net.Conn
 }
 
+// Close closes the connection to r.Addr.
 func (r *Response) Close() error {
 	return r.conn.Close()
 }
