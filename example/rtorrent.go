@@ -1,3 +1,7 @@
+/*
+Copyright 2013 Mathieu Lonjaret.
+*/
+
 package main
 
 import (
@@ -5,11 +9,13 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/mpl/scgiclient"
 )
 
-func ughxml(command, arg string) string {
+func ghettoXMLRpc(command, arg string) string {
+	// TODO(mpl): allow more args, types other than string maybe.
 	xml := `<?xml version="1.0"?>
 	<methodCall>
 		<methodName>` + command + `</methodName>`
@@ -20,28 +26,29 @@ func ughxml(command, arg string) string {
 	return xml
 }
 
+func usage() {
+	fmt.Print("	usage: rtorrentrpc host:port rpccommand [arg]\n")
+	fmt.Print("	See http://libtorrent.rakshasa.no/wiki/RTorrentCommands for the list of commands.\n")
+	os.Exit(1)
+}
+
 func main() {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) < 2 {
-		log.Fatal("wat")
+		usage()
 	}
-	// TODO(mpl): hostport parsing. trust for now.
 	addr := args[0]
 	command := args[1]
 	cmdArg := ""
 	if args[2] != "" {
 		cmdArg = args[2]
 	}
-	xmlrpc := ughxml(command, cmdArg)
-	conn, err := scgiclient.Send(addr, bytes.NewReader([]byte(xmlrpc)))
+	xmlrpc := ghettoXMLRpc(command, cmdArg)
+	resp, err := scgiclient.Send(addr, bytes.NewReader([]byte(xmlrpc)))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close()
-	resp, err := scgiclient.Receive(conn)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("%v", string(resp))
+	// TODO(mpl): Unmarshall response. meh.
+	fmt.Printf("%v", string(resp.Body))
 }
