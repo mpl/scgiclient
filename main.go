@@ -15,6 +15,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -24,7 +25,15 @@ import (
 // The received response is returned and the connection
 // to addr is closed.
 func Send(addr string, r io.Reader) (*Response, error) {
-	conn, err := net.Dial("tcp", addr)
+	var conn net.Conn
+
+	fi, err := os.Stat(addr)
+
+	if err == nil && fi.Mode()&os.ModeSocket != 0 {
+		conn, err = net.Dial("unix", addr)
+	} else {
+		conn, err = net.Dial("tcp", addr)
+	}
 	if err != nil {
 		return nil, err
 	}
