@@ -150,8 +150,14 @@ func receive(conn net.Conn) (*Response, error) {
 func defaultHeader(bodyLen int) []byte {
 	var dh []byte
 	defaultHeaderFields["CONTENT_LENGTH"] = strconv.Itoa(bodyLen)
-	for k, v := range defaultHeaderFields {
-		dh = append(dh, header(k, v)...)
+	order := []string{
+		"CONTENT_LENGTH",
+		"SCGI",
+		"REQUEST_METHOD",
+		"SERVER_PROTOCOL",
+	}
+	for _, k := range order {
+		dh = append(dh, header(k, defaultHeaderFields[k])...)
 	}
 	return dh
 }
