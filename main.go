@@ -149,15 +149,10 @@ func receive(conn net.Conn) (*Response, error) {
 
 func defaultHeader(bodyLen int) []byte {
 	var dh []byte
-	defaultHeaderFields["CONTENT_LENGTH"] = strconv.Itoa(bodyLen)
-	order := []string{
-		"CONTENT_LENGTH",
-		"SCGI",
-		"REQUEST_METHOD",
-		"SERVER_PROTOCOL",
-	}
-	for _, k := range order {
-		dh = append(dh, header(k, defaultHeaderFields[k])...)
+	// set CONTENT_LENGTH
+	defaultHeaderFields[0] = headerField{key: "CONTENT_LENGTH", value: strconv.Itoa(bodyLen)}
+	for _, hf := range defaultHeaderFields {
+		dh = append(dh, header(hf.key, hf.value)...)
 	}
 	return dh
 }
@@ -168,11 +163,17 @@ func header(name, value string) []byte {
 	return append(h, 0)
 }
 
-var defaultHeaderFields = map[string]string{
-	"CONTENT_LENGTH":  "",
-	"SCGI":            "1",
-	"REQUEST_METHOD":  "POST",
-	"SERVER_PROTOCOL": "HTTP/1.1",
+type headerField struct {
+	key   string
+	value string
+}
+
+// not using a map, because header fields need to be in order
+var defaultHeaderFields = []headerField{
+	{key: "CONTENT_LENGTH", value: ""},
+	{key: "SCGI", value: "1"},
+	{key: "REQUEST_METHOD", value: "POST"},
+	{key: "SERVER_PROTOCOL", value: "HTTP/1.1"},
 }
 
 const (
